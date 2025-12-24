@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Library, X, Menu } from 'lucide-react';
+import { Search, Library, X, Settings } from 'lucide-react';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -72,6 +72,10 @@ const Header: React.FC = () => {
               >
                 {isSearchOpen ? <X size={24} /> : <Search size={24} />}
               </button>
+              
+              <Link to="/admin" className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors" title="Admin Panel">
+                <Settings size={20} />
+              </Link>
             </div>
           </div>
         </div>
