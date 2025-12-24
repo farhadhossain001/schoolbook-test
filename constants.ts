@@ -36,11 +36,11 @@ export const getGoogleDriveDownloadLink = (url: string): string | null => {
 };
 
 // Helper to get a CORS-proxied URL for the PDF viewer
-// Uses corsproxy.io which handles redirects (like Google Drive's 302) better than other proxies
+// Using CodeTabs proxy which is robust for PDF binary redirects
 export const getProxiedPdfUrl = (url: string): string | null => {
   const downloadUrl = getGoogleDriveDownloadLink(url);
   if (!downloadUrl) return null;
-  return `https://corsproxy.io/?${encodeURIComponent(downloadUrl)}`;
+  return `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(downloadUrl)}`;
 };
 
 export const CLASSES: Category[] = Array.from({ length: 12 }, (_, i) => ({
@@ -50,6 +50,7 @@ export const CLASSES: Category[] = Array.from({ length: 12 }, (_, i) => ({
 }));
 
 // Mock Database with Bangla Content
+// Replaced test links with working samples for demonstration
 export const MOCK_BOOKS: Book[] = [
   {
     id: '1',
@@ -75,7 +76,7 @@ export const MOCK_BOOKS: Book[] = [
     subject: 'সামাজিক বিজ্ঞান',
     classLevel: '10',
     thumbnailUrl: 'https://picsum.photos/300/400?random=3',
-    pdfUrl: 'https://drive.google.com/open?id=test_id_3',
+    pdfUrl: 'https://drive.google.com/file/d/13QnZ6-57mN4A1KraWzpcKyLH8pKFXoWO/view', // Reuse working link
     description: 'শিল্প বিপ্লব এবং ভারতের জাতীয়তাবাদের গভীর আলোচনা।',
   },
   {
@@ -84,7 +85,7 @@ export const MOCK_BOOKS: Book[] = [
     subject: 'ইংরেজি',
     classLevel: '9',
     thumbnailUrl: 'https://picsum.photos/300/400?random=4',
-    pdfUrl: 'https://drive.google.com/file/d/test_id_4/preview',
+    pdfUrl: 'https://drive.google.com/file/d/115s4TYw-7mzDj2A4Ml755FKH1sScG41R/view', // Reuse working link
     description: 'ইংরেজি সাহিত্যের পাঠ্যপুস্তক।',
   },
   {
@@ -93,7 +94,7 @@ export const MOCK_BOOKS: Book[] = [
     subject: 'বিজ্ঞান',
     classLevel: '9',
     thumbnailUrl: 'https://picsum.photos/300/400?random=5',
-    pdfUrl: 'https://drive.google.com/file/d/test_id_5/preview',
+    pdfUrl: 'https://drive.google.com/file/d/1XefvptuYY3rRelUfTBB73D5RByvfSBt4/view',
   },
   {
     id: '6',
@@ -101,7 +102,7 @@ export const MOCK_BOOKS: Book[] = [
     subject: 'বিজ্ঞান',
     classLevel: '10',
     thumbnailUrl: 'https://picsum.photos/300/400?random=6',
-    pdfUrl: 'https://drive.google.com/file/d/test_id_6/preview',
+    pdfUrl: 'https://drive.google.com/file/d/115s4TYw-7mzDj2A4Ml755FKH1sScG41R/view',
   },
   {
     id: '7',
@@ -109,7 +110,7 @@ export const MOCK_BOOKS: Book[] = [
     subject: 'সামাজিক বিজ্ঞান',
     classLevel: '9',
     thumbnailUrl: 'https://picsum.photos/300/400?random=7',
-    pdfUrl: 'https://drive.google.com/file/d/test_id_7/preview',
+    pdfUrl: 'https://drive.google.com/file/d/1XefvptuYY3rRelUfTBB73D5RByvfSBt4/view',
   },
   {
     id: '8',
@@ -117,7 +118,7 @@ export const MOCK_BOOKS: Book[] = [
     subject: 'অর্থনীতি',
     classLevel: '11',
     thumbnailUrl: 'https://picsum.photos/300/400?random=8',
-    pdfUrl: 'https://drive.google.com/file/d/test_id_8/preview',
+    pdfUrl: 'https://drive.google.com/file/d/115s4TYw-7mzDj2A4Ml755FKH1sScG41R/view',
   },
   {
     id: '9',
@@ -125,7 +126,7 @@ export const MOCK_BOOKS: Book[] = [
     subject: 'ব্যবসায়',
     classLevel: '12',
     thumbnailUrl: 'https://picsum.photos/300/400?random=9',
-    pdfUrl: 'https://drive.google.com/file/d/test_id_9/preview',
+    pdfUrl: 'https://drive.google.com/file/d/1XefvptuYY3rRelUfTBB73D5RByvfSBt4/view',
   },
   {
     id: '10',
@@ -133,6 +134,6 @@ export const MOCK_BOOKS: Book[] = [
     subject: 'গণিত',
     classLevel: '1',
     thumbnailUrl: 'https://picsum.photos/300/400?random=10',
-    pdfUrl: 'https://drive.google.com/file/d/test_id_10/preview',
+    pdfUrl: 'https://drive.google.com/file/d/115s4TYw-7mzDj2A4Ml755FKH1sScG41R/view',
   },
 ];

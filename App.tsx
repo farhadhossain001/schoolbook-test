@@ -1,27 +1,31 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Home from './pages/Home';
 import BookList from './pages/BookList';
 import BookDetails from './pages/BookDetails';
 import PdfViewer from './pages/PdfViewer';
 import SearchResults from './pages/SearchResults';
+import Admin from './pages/Admin';
+import { BookProvider } from './context/BookContext';
 
 // Helper to conditionally render header
 const Layout: React.FC = () => {
   const location = useLocation();
   // Don't show header on read page to maximize space
   const isReader = location.pathname.startsWith('/read/');
+  const isAdmin = location.pathname.startsWith('/admin');
 
   return (
     <>
-      {!isReader && <Header />}
+      {!isReader && !isAdmin && <Header />}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/class/:classId" element={<BookList />} />
         <Route path="/search" element={<SearchResults />} />
         <Route path="/book/:bookId" element={<BookDetails />} />
         <Route path="/read/:bookId" element={<PdfViewer />} />
+        <Route path="/admin" element={<Admin />} />
       </Routes>
     </>
   );
@@ -29,9 +33,11 @@ const Layout: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <Layout />
-    </Router>
+    <BookProvider>
+      <Router>
+        <Layout />
+      </Router>
+    </BookProvider>
   );
 };
 
