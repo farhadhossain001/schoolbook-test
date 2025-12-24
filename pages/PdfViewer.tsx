@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { MOCK_BOOKS, getProxiedPdfUrl, getEmbedUrl } from '../constants';
+import { useBooks } from '../context/BookContext';
+import { getProxiedPdfUrl, getEmbedUrl } from '../constants';
 import { 
   ArrowLeft, 
   ZoomIn, 
@@ -13,30 +14,37 @@ import {
   Maximize,
   Minimize,
   AlertCircle,
-  FileText
+  FileText,
+  ExternalLink
 } from 'lucide-react';
 
 // Initialize PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+const pdfJsVersion = '3.11.174';
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfJsVersion}/build/pdf.worker.min.js`;
 
 const PdfViewer: React.FC = () => {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
+  const { books } = useBooks();
   
   // Book Data
-  const book = MOCK_BOOKS.find(b => b.id === bookId);
-  const proxiedUrl = book ? getProxiedPdfUrl(book.pdfUrl) : null;
-  const embedUrl = book ? getEmbedUrl(book.pdfUrl) : null;
+  const book = books.find(b => b.id === bookId);
+  const proxiedUrl = book?.pdfUrl ? getProxiedPdfUrl(book.pdfUrl) : null;
+  const embedUrl = book?.pdfUrl ? getEmbedUrl(book.pdfUrl) : null;
 
-  // View Mode
+  // View Mode: 'custom' = react-pdf, 'drive' = iframe embed
   const [viewMode, setViewMode] = useState<'custom' | 'drive'>('custom');
 
   // PDF State
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.0); // 1.0 = Fit Width (relative to container)
+  const [scale, setScale] = useState<number>(1.0); 
   const [rotation, setRotation] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // Loading States
+  const [isDownloading, setIsDownloading] = useState<boolean>(true); 
+  const [isRendering, setIsRendering] = useState<boolean>(true); 
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -49,13 +57,86 @@ const PdfViewer: React.FC = () => {
   const contentRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ dist: number; scale: number } | null>(null);
 
-  // Calculate available width for "Fit to Screen"
-  // Optimized to avoid unnecessary re-renders on mobile scroll (address bar hide/show)
+  // PDF.js Options
+  const options = useMemo(() => ({
+    cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfJsVersion}/cmaps/`,
+    cMapPacked: true,
+  }), []);
+
+  // 1. Initial Checks & Fetch
+  useEffect(() => {
+    // If book not found or no URL, stop loading
+    if (!book || !book.pdfUrl) {
+      setIsDownloading(false);
+      setIsRendering(false);
+      setError('বইটি খুঁজে পাওয়া যায়নি অথবা পিডিএফ লিংক নেই।');
+      return;
+    }
+
+    // If we can't proxy it (e.g. not a drive link), fallback immediately
+    if (!proxiedUrl && viewMode === 'custom') {
+       console.warn("Cannot proxy this URL, switching to Drive view");
+       setViewMode('drive');
+       return;
+    }
+
+    // Only fetch if in custom mode
+    if (viewMode !== 'custom') return;
+    
+    // Reset states
+    setIsDownloading(true);
+    setError(null);
+    setPdfBlobUrl(null);
+    
+    let active = true;
+
+    const fetchPdf = async () => {
+      try {
+        // Fetch with a timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+        const response = await fetch(proxiedUrl!, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+        
+        const blob = await response.blob();
+        
+        // Basic validation that it is a PDF
+        if (blob.type !== 'application/pdf' && blob.size < 1000) {
+           // sometimes proxy returns HTML error page
+           throw new Error('Invalid PDF content');
+        }
+
+        if (active) {
+           const objectUrl = URL.createObjectURL(blob);
+           setPdfBlobUrl(objectUrl);
+           setIsDownloading(false);
+        }
+      } catch (err) {
+        console.error("PDF Download/Proxy Error:", err);
+        if (active) {
+           // Auto-fallback to Drive Viewer on failure
+           setViewMode('drive');
+        }
+      }
+    };
+
+    fetchPdf();
+
+    return () => {
+      active = false;
+      if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+    };
+  }, [proxiedUrl, book, viewMode]);
+
+
+  // 2. Responsive Size Calculation
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
         const currentWidth = containerRef.current.clientWidth;
-        // Only update if width actually changed (ignores vertical resizing from mobile URL bar)
         if (Math.abs(currentWidth - prevContainerWidth.current) > 10) {
             const padding = window.innerWidth < 640 ? 32 : 64;
             const newWidth = currentWidth - padding;
@@ -65,9 +146,7 @@ const PdfViewer: React.FC = () => {
       }
     };
     
-    // Initial measure
     handleResize();
-    
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -75,14 +154,14 @@ const PdfViewer: React.FC = () => {
   // Handlers
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    setIsLoading(false);
+    setIsRendering(false);
     setError(null);
   };
 
   const onDocumentLoadError = (err: Error) => {
-    console.error("PDF Load Error:", err);
-    setIsLoading(false);
-    setError("এই বইটি কাস্টম রিডারে লোড করা যাচ্ছে না। দয়া করে ড্রাইভ ভিউয়ার ব্যবহার করুন।");
+    console.error("PDF Parse Error:", err);
+    // Auto-fallback if parsing fails
+    setViewMode('drive');
   };
 
   const changePage = (offset: number) => {
@@ -100,33 +179,24 @@ const PdfViewer: React.FC = () => {
     }
   };
 
-  // --- Smooth Pinch-to-Zoom Logic ---
-  
+  const handleZoomIn = () => setScale(s => Math.min(4, s + 0.25));
+  const handleZoomOut = () => setScale(s => Math.max(1, s - 0.25));
+
+  // --- Pinch Zoom ---
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       touchStartRef.current = { dist, scale };
     } else {
-      // Safety: Ensure we don't track single touches as zoom starts
       touchStartRef.current = null;
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (e.touches.length === 2 && touchStartRef.current && contentRef.current) {
-      // Prevent default to stop browser native zoom/scroll behavior
       e.preventDefault(); 
-      
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       const ratio = dist / touchStartRef.current.dist;
-      // Visually scale instantly using CSS
       contentRef.current.style.transform = `scale(${ratio})`;
       contentRef.current.style.transformOrigin = 'center top';
       contentRef.current.style.transition = 'none';
@@ -135,31 +205,20 @@ const PdfViewer: React.FC = () => {
 
   const handleTouchEnd = () => {
     if (touchStartRef.current && contentRef.current) {
-      // Calculate final scale from the CSS transform
       const transform = contentRef.current.style.transform;
       const match = transform.match(/scale\((.*?)\)/);
       const ratio = match ? parseFloat(match[1]) : 1;
-
-      // Reset CSS
       contentRef.current.style.transform = 'none';
       contentRef.current.style.transition = 'transform 0.2s ease-out';
-      
-      // Update actual PDF scale (Resolution)
       const newScale = touchStartRef.current.scale * ratio;
-      // Clamp scale: Minimum 1.0 (Fit Width), Max 4.0
       setScale(Math.min(Math.max(1.0, newScale), 4.0));
-      
       touchStartRef.current = null;
     }
   };
 
-  // Zoom Button Handlers
-  const handleZoomIn = () => setScale(s => Math.min(4, s + 0.25));
-  const handleZoomOut = () => setScale(s => Math.max(1, s - 0.25));
-
   if (!book) return null;
 
-  // --- Render: Drive Fallback ---
+  // --- Drive View (Fallback) ---
   if (viewMode === 'drive') {
     return (
       <div className={`fixed inset-0 z-[100] bg-slate-900 flex flex-col ${isFullscreen ? 'h-screen' : ''}`}>
@@ -171,7 +230,7 @@ const PdfViewer: React.FC = () => {
             <span className="font-bold text-sm text-slate-100 truncate">{book.title}</span>
           </div>
           <div className="flex gap-2">
-             <button onClick={() => setViewMode('custom')} className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-indigo-600 rounded-lg text-xs font-bold">
+             <button onClick={() => setViewMode('custom')} className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-500">
                <FileText size={14} /> Custom Reader
              </button>
              <button onClick={toggleFullscreen} className="p-2 bg-slate-800 rounded-lg">
@@ -179,14 +238,33 @@ const PdfViewer: React.FC = () => {
              </button>
           </div>
         </div>
-        <div className="flex-1 bg-black relative">
-           <iframe src={embedUrl || ''} className="w-full h-full border-none" allow="autoplay; fullscreen" title="Drive Viewer" />
+        
+        {/* Iframe Container */}
+        <div className="flex-1 bg-black relative flex items-center justify-center">
+           {embedUrl ? (
+             <iframe 
+                src={embedUrl} 
+                className="w-full h-full border-none" 
+                allow="autoplay; fullscreen" 
+                title="Drive Viewer" 
+             />
+           ) : (
+             <div className="text-white text-center p-6">
+                <AlertCircle size={48} className="mx-auto mb-4 text-red-400"/>
+                <p>এই বইয়ের লিংকটি সরাসরি ভিউ করার জন্য উপযুক্ত নয়।</p>
+                <a href={book.pdfUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 bg-indigo-600 px-4 py-2 rounded-lg text-sm font-bold">
+                  <ExternalLink size={16}/> ড্রাইভ এ খুলুন
+                </a>
+             </div>
+           )}
         </div>
       </div>
     );
   }
 
-  // --- Render: Custom Reader ---
+  // --- Custom View ---
+  const isLoading = isDownloading || isRendering;
+
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col h-full overflow-hidden">
       {/* Toolbar */}
@@ -207,6 +285,9 @@ const PdfViewer: React.FC = () => {
         </div>
 
         <div className="flex items-center justify-end gap-2 w-1/3">
+           <button onClick={() => setViewMode('drive')} className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/30 rounded-lg" title="Switch to Basic Viewer">
+             <FileText size={20} />
+           </button>
            <button onClick={toggleFullscreen} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg">
              {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
            </button>
@@ -217,84 +298,97 @@ const PdfViewer: React.FC = () => {
       <div 
         className="flex-1 bg-slate-900 overflow-auto relative flex justify-center p-4 sm:p-8 no-scrollbar"
         ref={containerRef}
-        // touch-action: pan-x pan-y allows browser scrolling but DISABLES browser gestures (like pinch zoom)
-        // so our manual JS pinch logic works without conflict, and single finger just scrolls.
         style={{ touchAction: 'pan-x pan-y' }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd} // Handle interruption
+        onTouchCancel={handleTouchEnd}
       >
         {isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
-            <Loader2 size={40} className="animate-spin mb-4 text-indigo-500" />
-            <p className="text-sm">বইটি লোড করা হচ্ছে...</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 z-10">
+             <div className="relative mb-4">
+                <Loader2 size={48} className="animate-spin text-indigo-500" />
+             </div>
+             <p className="text-sm font-medium mb-4">
+                {isDownloading ? "বইটি ডাউনলোড হচ্ছে..." : "প্রস্তুত করা হচ্ছে..."}
+             </p>
+             {/* Fallback button if loading takes too long */}
+             {isDownloading && (
+               <button 
+                 onClick={() => setViewMode('drive')}
+                 className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-full transition-colors border border-slate-700"
+               >
+                 দেরি হচ্ছে? ড্রাইভ ভিউয়ার ব্যবহার করুন
+               </button>
+             )}
           </div>
         )}
 
-        {error && (
+        {error ? (
            <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 z-10 px-4 text-center">
               <AlertCircle size={48} className="text-red-400 mb-4" />
               <h3 className="text-lg font-bold text-white mb-2">সমস্যা হয়েছে</h3>
               <p className="max-w-md mb-6">{error}</p>
-              <button onClick={() => setViewMode('drive')} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold">
-                ড্রাইভ ভিউয়ারে খুলুন
+              <button onClick={() => navigate(-1)} className="bg-slate-700 text-white px-6 py-2 rounded-lg font-bold">
+                ফিরে যান
               </button>
            </div>
-        )}
-
-        {!error && proxiedUrl && (
-          <div 
-            ref={contentRef}
-            className="shadow-2xl shadow-black/50 origin-top transition-transform duration-75 ease-out"
-            // Important: This div wraps the Document to allow CSS transforms
-          >
-             <Document
-                file={proxiedUrl}
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={onDocumentLoadError}
-                loading={null}
-                className="flex flex-col gap-4"
-             >
-                <Page 
-                  pageNumber={pageNumber} 
-                  scale={scale} 
-                  rotate={rotation}
-                  width={pdfWidth} // Force fit to container width
-                  renderTextLayer={false} 
-                  renderAnnotationLayer={false}
-                  className="bg-white shadow-lg"
+        ) : (
+          pdfBlobUrl && (
+            <div 
+              ref={contentRef}
+              className={`shadow-2xl shadow-black/50 origin-top transition-transform duration-75 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'}`}
+            >
+               <Document
+                  file={pdfBlobUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={onDocumentLoadError}
                   loading={null}
-                />
-             </Document>
-          </div>
+                  className="flex flex-col gap-4"
+                  options={options}
+               >
+                  <Page 
+                    pageNumber={pageNumber} 
+                    scale={scale} 
+                    rotate={rotation}
+                    width={pdfWidth}
+                    renderTextLayer={false} 
+                    renderAnnotationLayer={false}
+                    className="bg-white shadow-lg"
+                    loading={null}
+                  />
+               </Document>
+            </div>
+          )
         )}
       </div>
 
       {/* Pagination */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-md border border-slate-700/50 rounded-full px-4 py-2 flex items-center gap-4 shadow-xl z-30">
-        <button 
-          disabled={pageNumber <= 1} 
-          onClick={() => changePage(-1)}
-          className="p-1.5 rounded-full hover:bg-slate-700 disabled:opacity-30 text-white"
-        >
-          <ChevronLeft size={24} />
-        </button>
-        
-        <div className="flex items-center gap-2 text-sm font-mono text-white">
-           <span className="font-bold">{pageNumber}</span>
-           <span className="text-slate-400">/</span>
-           <span>{numPages || '--'}</span>
-        </div>
+      {!isLoading && !error && (
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-md border border-slate-700/50 rounded-full px-4 py-2 flex items-center gap-4 shadow-xl z-30">
+          <button 
+            disabled={pageNumber <= 1} 
+            onClick={() => changePage(-1)}
+            className="p-1.5 rounded-full hover:bg-slate-700 disabled:opacity-30 text-white"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          
+          <div className="flex items-center gap-2 text-sm font-mono text-white">
+            <span className="font-bold">{pageNumber}</span>
+            <span className="text-slate-400">/</span>
+            <span>{numPages || '--'}</span>
+          </div>
 
-        <button 
-          disabled={numPages === null || pageNumber >= numPages} 
-          onClick={() => changePage(1)}
-          className="p-1.5 rounded-full hover:bg-slate-700 disabled:opacity-30 text-white"
-        >
-          <ChevronRight size={24} />
-        </button>
-      </div>
+          <button 
+            disabled={numPages === null || pageNumber >= numPages} 
+            onClick={() => changePage(1)}
+            className="p-1.5 rounded-full hover:bg-slate-700 disabled:opacity-30 text-white"
+          >
+            <ChevronRight size={24} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

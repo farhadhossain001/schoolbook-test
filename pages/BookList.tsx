@@ -1,14 +1,15 @@
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { MOCK_BOOKS } from '../constants';
+import { useBooks } from '../context/BookContext';
 import BookCard from '../components/BookCard';
-import { ArrowLeft, BookX } from 'lucide-react';
+import { ArrowLeft, BookX, Loader2 } from 'lucide-react';
 
 const BookList: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
   const navigate = useNavigate();
+  const { books, isLoading } = useBooks();
 
-  const filteredBooks = MOCK_BOOKS.filter(book => book.classLevel === classId);
+  const filteredBooks = books.filter(book => book.classLevel === classId);
 
   const toBanglaDigit = (str: string | undefined) => {
     if (!str) return "";
@@ -41,7 +42,11 @@ const BookList: React.FC = () => {
       </div>
 
       {/* Grid */}
-      {filteredBooks.length > 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="animate-spin text-indigo-600" size={40} />
+        </div>
+      ) : filteredBooks.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
           {filteredBooks.map((book) => (
             <BookCard key={book.id} book={book} />

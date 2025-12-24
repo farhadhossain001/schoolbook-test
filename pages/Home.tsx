@@ -1,14 +1,16 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CLASSES, MOCK_BOOKS } from '../constants';
+import { CLASSES } from '../constants';
+import { useBooks } from '../context/BookContext';
 import BookCard from '../components/BookCard';
-import { Book, Compass, ChevronRight, Search } from 'lucide-react';
+import { Book, Compass, ChevronRight, Search, Loader2 } from 'lucide-react';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
+  const { books, isLoading } = useBooks();
 
   // Trending books
-  const trendingBooks = MOCK_BOOKS.slice(0, 5);
+  const trendingBooks = books.slice(0, 5);
 
   return (
     <div className="min-h-screen pb-24">
@@ -98,11 +100,17 @@ const Home: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-            {trendingBooks.map((book) => (
-              <BookCard key={book.id} book={book} />
-            ))}
-          </div>
+          {isLoading ? (
+             <div className="flex justify-center py-10">
+               <Loader2 className="animate-spin text-indigo-600" size={32} />
+             </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+              {trendingBooks.map((book) => (
+                <BookCard key={book.id} book={book} />
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>

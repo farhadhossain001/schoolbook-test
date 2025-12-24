@@ -1,13 +1,14 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MOCK_BOOKS } from '../constants';
-import { ArrowLeft, BookOpen, Download, Share2, Info } from 'lucide-react';
+import { useBooks } from '../context/BookContext';
+import { ArrowLeft, BookOpen, Download, Share2, Info, Loader2 } from 'lucide-react';
 
 const BookDetails: React.FC = () => {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
+  const { books, isLoading } = useBooks();
   
-  const book = MOCK_BOOKS.find(b => b.id === bookId);
+  const book = books.find(b => b.id === bookId);
 
   // Robust Navigation: Always go up to the Class List or Home
   const handleBack = () => {
@@ -25,6 +26,14 @@ const BookDetails: React.FC = () => {
   const toBanglaDigit = (str: string) => {
     return str.replace(/[0-9]/g, (d) => "০১২৩৪৫৬৭৮৯"[parseInt(d)]);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="animate-spin text-indigo-600" size={40} />
+      </div>
+    );
+  }
 
   if (!book) {
     return (

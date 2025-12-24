@@ -1,22 +1,29 @@
 import React from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MOCK_BOOKS } from '../constants';
+import { useBooks } from '../context/BookContext';
 import BookCard from '../components/BookCard';
-import { ArrowLeft, SearchX } from 'lucide-react';
+import { ArrowLeft, SearchX, Loader2 } from 'lucide-react';
 
 const SearchResults: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { books, isLoading } = useBooks();
   const query = searchParams.get('q') || '';
 
-  const filteredBooks = MOCK_BOOKS.filter(book => {
+  const filteredBooks = books.filter(book => {
     if (!query) return true;
     const q = query.toLowerCase();
+    
+    // Defensive coding: Ensure all fields are strings
+    const title = book.title ? String(book.title).toLowerCase() : '';
+    const subject = book.subject ? String(book.subject).toLowerCase() : '';
+    const classLevel = book.classLevel ? String(book.classLevel).toLowerCase() : '';
+
     return (
-      book.title.toLowerCase().includes(q) ||
-      book.subject.toLowerCase().includes(q) ||
-      `class ${book.classLevel}`.includes(q) ||
-      book.classLevel === q
+      title.includes(q) ||
+      subject.includes(q) ||
+      `class ${classLevel}`.includes(q) ||
+      classLevel === q
     );
   });
 
@@ -43,7 +50,11 @@ const SearchResults: React.FC = () => {
         </p>
       </div>
 
-      {filteredBooks.length > 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="animate-spin text-indigo-600" size={40} />
+        </div>
+      ) : filteredBooks.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
           {filteredBooks.map((book) => (
             <BookCard key={book.id} book={book} />
