@@ -2,6 +2,7 @@ import React from 'react';
 import { Book } from '../types';
 import { ArrowRight, BookOpenCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ADMISSION_CATEGORIES } from '../constants';
 
 interface BookCardProps {
   book: Book;
@@ -18,6 +19,15 @@ const BookCard: React.FC<BookCardProps> = ({ book }) => {
     return str.replace(/[0-9]/g, (d) => "০১২৩৪৫৬৭৮৯"[parseInt(d)]);
   };
 
+  const getSubCategoryLabel = () => {
+    if (book.classLevel === 'admission' && book.subCategory) {
+       const cat = ADMISSION_CATEGORIES.find(c => c.id === book.subCategory);
+       // Return short label without emoji if possible, or just label
+       return cat ? cat.label.split(' ').slice(1).join(' ') : book.subCategory;
+    }
+    return null;
+  };
+
   return (
     <div 
       onClick={handleCardClick}
@@ -31,10 +41,15 @@ const BookCard: React.FC<BookCardProps> = ({ book }) => {
           className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
           loading="lazy"
         />
-        <div className="absolute top-0 right-0 p-2">
+        <div className="absolute top-0 right-0 p-2 flex flex-col gap-1 items-end">
           <span className="bg-white/90 backdrop-blur-sm text-indigo-700 text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm border border-white/50">
-            শ্রেণী {toBanglaDigit(book.classLevel)}
+            {book.classLevel === 'admission' ? 'ভর্তি' : `শ্রেণী ${toBanglaDigit(book.classLevel)}`}
           </span>
+          {getSubCategoryLabel() && (
+             <span className="bg-amber-100/90 backdrop-blur-sm text-amber-800 text-[10px] font-bold px-2 py-1 rounded-lg shadow-sm border border-white/50">
+               {getSubCategoryLabel()}
+             </span>
+          )}
         </div>
         
         {/* Hover Overlay */}

@@ -43,14 +43,24 @@ export const getProxiedPdfUrl = (url: string): string | null => {
   return `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(downloadUrl)}`;
 };
 
-export const CLASSES: Category[] = Array.from({ length: 12 }, (_, i) => ({
-  id: `class-${i + 1}`,
-  label: `শ্রেণী ${['১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯', '১০', '১১', '১২'][i]}`,
-  value: (i + 1).toString(),
-}));
+// Updated: Removed Class 11 & 12 (length reduced to 10), Renamed Admission
+export const CLASSES: Category[] = [
+  ...Array.from({ length: 10 }, (_, i) => ({
+    id: `class-${i + 1}`,
+    label: `শ্রেণী ${['১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯', '১০'][i]}`,
+    value: (i + 1).toString(),
+  })),
+  { id: 'admission', label: 'কলেজ ও ভর্তি প্রস্তুতি', value: 'admission' }
+];
+
+export const ADMISSION_CATEGORIES = [
+  { id: 'textbook', label: '📚 মূল বই' },
+  { id: 'highlighted', label: '📝 দাগানো বই' },
+  { id: 'concept', label: '💡 কনসেপ্ট বুক' },
+  { id: 'question_bank', label: '❓ প্রশ্নব্যাংক' },
+];
 
 // Mock Database with Bangla Content
-// Replaced test links with working samples for demonstration
 export const MOCK_BOOKS: Book[] = [
   {
     id: '1',
@@ -76,7 +86,7 @@ export const MOCK_BOOKS: Book[] = [
     subject: 'সামাজিক বিজ্ঞান',
     classLevel: '10',
     thumbnailUrl: 'https://picsum.photos/300/400?random=3',
-    pdfUrl: 'https://drive.google.com/file/d/13QnZ6-57mN4A1KraWzpcKyLH8pKFXoWO/view', // Reuse working link
+    pdfUrl: 'https://drive.google.com/file/d/13QnZ6-57mN4A1KraWzpcKyLH8pKFXoWO/view', 
     description: 'শিল্প বিপ্লব এবং ভারতের জাতীয়তাবাদের গভীর আলোচনা।',
   },
   {
@@ -85,7 +95,7 @@ export const MOCK_BOOKS: Book[] = [
     subject: 'ইংরেজি',
     classLevel: '9',
     thumbnailUrl: 'https://picsum.photos/300/400?random=4',
-    pdfUrl: 'https://drive.google.com/file/d/115s4TYw-7mzDj2A4Ml755FKH1sScG41R/view', // Reuse working link
+    pdfUrl: 'https://drive.google.com/file/d/115s4TYw-7mzDj2A4Ml755FKH1sScG41R/view', 
     description: 'ইংরেজি সাহিত্যের পাঠ্যপুস্তক।',
   },
   {
@@ -136,4 +146,14 @@ export const MOCK_BOOKS: Book[] = [
     thumbnailUrl: 'https://picsum.photos/300/400?random=10',
     pdfUrl: 'https://drive.google.com/file/d/115s4TYw-7mzDj2A4Ml755FKH1sScG41R/view',
   },
+  {
+    id: '11',
+    title: 'পদার্থবিজ্ঞান কনসেপ্ট বুক',
+    subject: 'পদার্থবিজ্ঞান',
+    classLevel: 'admission',
+    subCategory: 'concept',
+    thumbnailUrl: 'https://picsum.photos/300/400?random=11',
+    pdfUrl: 'https://drive.google.com/file/d/115s4TYw-7mzDj2A4Ml755FKH1sScG41R/view',
+    description: 'বিশ্ববিদ্যালয় ভর্তির জন্য পদার্থবিজ্ঞান কনসেপ্ট বুক',
+  }
 ];

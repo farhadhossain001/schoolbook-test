@@ -19,12 +19,12 @@ import {
   AlertCircle,
   BookOpen,
   ChevronDown,
-  ChevronUp
+  Hammer
 } from 'lucide-react';
-import { getApiUrl, setApiUrl, addBookToSheet, updateBookInSheet, deleteBookFromSheet, getAdminPassword, fetchBooksFromSheet } from '../services/api';
+import { getApiUrl, setApiUrl, addBookToSheet, updateBookInSheet, deleteBookFromSheet, getAdminPassword, resetAndSeedDatabase } from '../services/api';
 import { useBooks } from '../context/BookContext';
 import { Book } from '../types';
-import { CLASSES, MOCK_BOOKS } from '../constants';
+import { CLASSES, MOCK_BOOKS, ADMISSION_CATEGORIES } from '../constants';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -49,6 +49,7 @@ const Admin: React.FC = () => {
     title: '',
     subject: '',
     classLevel: '10',
+    subCategory: '',
     thumbnailUrl: '',
     pdfUrl: '',
     description: ''
@@ -99,6 +100,7 @@ const Admin: React.FC = () => {
       title: book.title,
       subject: book.subject,
       classLevel: book.classLevel,
+      subCategory: book.subCategory || '',
       thumbnailUrl: book.thumbnailUrl,
       pdfUrl: book.pdfUrl,
       description: book.description || ''
@@ -127,11 +129,13 @@ const Admin: React.FC = () => {
     setIsSubmitting(true);
     setMessage({ type: 'info', text: 'অপেক্ষা করুন...' });
 
+    // Important: subCategory needs to be a string (even empty) to ensure backend updates correctly
     const bookData: Book = {
       id: editingId || Date.now().toString(),
       title: formData.title!,
       subject: formData.subject!,
       classLevel: formData.classLevel!,
+      subCategory: formData.classLevel === 'admission' ? (formData.subCategory || 'textbook') : '',
       thumbnailUrl: formData.thumbnailUrl || 'https://placehold.co/300x400?text=No+Cover',
       pdfUrl: formData.pdfUrl!,
       description: formData.description
@@ -177,42 +181,37 @@ const Admin: React.FC = () => {
     }
   };
 
-  const handleSyncMockBooks = async () => {
+  const handleResetAndFix = async () => {
     if (!scriptUrl) {
-      setMessage({ type: 'error', text: 'সেটিংস ঠিক নেই।' });
-      setShowSettings(true);
-      return;
+       setMessage({ type: 'error', text: 'সেটিংস ঠিক নেই।' });
+       setShowSettings(true);
+       return;
     }
-    if (!window.confirm('শিটে ১০টি ডেমো বই যুক্ত হবে। আপনি কি নিশ্চিত?')) return;
+    
+    const confirmMsg = "সাবধান! এটি আপনার বর্তমান গুগল শিটের সব ডাটা মুছে ফেলবে এবং নতুন স্ট্রাকচার তৈরি করে ডেমো ডাটা আপলোড করবে। আপনি কি নিশ্চিত?";
+    if (!window.confirm(confirmMsg)) return;
 
     setIsSyncing(true);
-    setMessage({ type: 'info', text: 'আপলোড শুরু হচ্ছে...' });
+    setMessage({ type: 'info', text: 'পুরনো ডাটা মুছে নতুন স্ট্রাকচার তৈরি হচ্ছে...' });
     
-    let successCount = 0;
-    const total = MOCK_BOOKS.length;
+    // Prepare mock books with correct structure
+    const booksToSeed = MOCK_BOOKS.map((b, i) => ({
+      ...b,
+      id: (Date.now() + i).toString(),
+      subCategory: b.classLevel === 'admission' ? (b.subCategory || 'concept') : ''
+    }));
 
-    for (let i = 0; i < total; i++) {
-      const book = MOCK_BOOKS[i];
-      const bookToUpload = { ...book, id: Date.now().toString() + i };
-      
-      try {
-        await new Promise(r => setTimeout(r, 800));
-        const success = await addBookToSheet(bookToUpload);
-        if (success) {
-          successCount++;
-          setMessage({ type: 'info', text: `আপলোড হচ্ছে... (${i + 1}/${total})` });
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
+    const success = await resetAndSeedDatabase(booksToSeed);
 
     setIsSyncing(false);
-    if (successCount > 0) {
-      setMessage({ type: 'success', text: 'আপলোড সম্পন্ন! রিফ্রেশ হচ্ছে...' });
-      setTimeout(refreshBooks, 3000);
+    if (success) {
+      setMessage({ type: 'success', text: 'ডাটাবেস ফিক্স করা হয়েছে! রিফ্রেশ হচ্ছে...' });
+      setTimeout(() => {
+        refreshBooks();
+        window.location.reload();
+      }, 3000);
     } else {
-      setMessage({ type: 'error', text: 'আপলোড ব্যর্থ।' });
+      setMessage({ type: 'error', text: 'ফিক্স করা সম্ভব হয়নি।' });
     }
   };
 
@@ -334,16 +333,16 @@ const Admin: React.FC = () => {
              </div>
            </div>
 
-           {/* Quick Action: Mock Sync */}
+           {/* Quick Action: Reset & Fix */}
            <button 
-             onClick={handleSyncMockBooks}
+             onClick={handleResetAndFix}
              disabled={isSyncing}
-             className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-amber-300 hover:bg-amber-50 transition-all flex flex-col justify-between text-left group"
+             className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:border-red-300 hover:bg-red-50 transition-all flex flex-col justify-between text-left group"
            >
-             <span className="text-xs font-bold text-slate-400 uppercase group-hover:text-amber-600">টুলস</span>
+             <span className="text-xs font-bold text-slate-400 uppercase group-hover:text-red-600">জরুরি</span>
              <div className="flex items-end justify-between mt-2">
-               <span className="text-sm font-bold text-slate-700 group-hover:text-amber-700">ডেমো বই আপলোড</span>
-               {isSyncing ? <Loader2 size={20} className="animate-spin text-amber-600" /> : <UploadCloud size={20} className="text-slate-300 group-hover:text-amber-600" />}
+               <span className="text-sm font-bold text-slate-700 group-hover:text-red-700">ডাটাবেস ফিক্স করুন</span>
+               {isSyncing ? <Loader2 size={20} className="animate-spin text-red-600" /> : <Hammer size={20} className="text-slate-300 group-hover:text-red-600" />}
              </div>
            </button>
         </div>
@@ -429,6 +428,24 @@ const Admin: React.FC = () => {
                     </div>
                  </div>
 
+                 {/* Admission Sub-Category Dropdown */}
+                 {formData.classLevel === 'admission' && (
+                    <div className="space-y-1 animate-in slide-in-from-top-2">
+                       <label className="text-[11px] font-bold text-indigo-600 uppercase tracking-wide ml-1">বইয়ের ধরণ (Admission)</label>
+                       <div className="relative">
+                         <select 
+                           value={formData.subCategory || 'concept'} 
+                           onChange={e => setFormData({...formData, subCategory: e.target.value})} 
+                           className="w-full px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all text-sm font-bold text-indigo-700 appearance-none cursor-pointer"
+                         >
+                           {/* Allow ALL categories including textbook */}
+                           {ADMISSION_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                         </select>
+                         <ChevronDown size={14} className="absolute right-3 top-3.5 text-indigo-400 pointer-events-none" />
+                       </div>
+                    </div>
+                 )}
+
                  <div className="space-y-1">
                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide ml-1">Google Drive PDF Link</label>
                    <input required type="url" value={formData.pdfUrl} onChange={e => setFormData({...formData, pdfUrl: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all text-xs font-mono text-slate-600" placeholder="https://drive.google.com/..." />
@@ -505,6 +522,14 @@ const Admin: React.FC = () => {
                                <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">শ্রেণী {book.classLevel}</span>
                                <span className="text-[10px] text-slate-400">•</span>
                                <span className="text-[10px] font-medium text-slate-500">{book.subject}</span>
+                               {book.subCategory && (
+                                 <>
+                                   <span className="text-[10px] text-slate-400">•</span>
+                                   <span className="text-[10px] font-medium text-indigo-500 bg-indigo-50 px-1 rounded">
+                                      {ADMISSION_CATEGORIES.find(c => c.id === book.subCategory)?.label || book.subCategory}
+                                   </span>
+                                 </>
+                               )}
                              </div>
                            </div>
                            

@@ -2,7 +2,8 @@ export interface Book {
   id: string;
   title: string;
   subject: string;
-  classLevel: string; // e.g., "9", "10", "12"
+  classLevel: string; // e.g., "9", "10", "12", "admission"
+  subCategory?: string; // 'textbook', 'highlighted', 'concept', 'question_bank'
   thumbnailUrl: string;
   pdfUrl: string; // The raw Google Drive link
   description?: string;

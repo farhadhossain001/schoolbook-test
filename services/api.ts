@@ -4,7 +4,7 @@ const STORAGE_KEY_URL = 'schoolbooks_api_url';
 const STORAGE_KEY_PASSWORD = 'schoolbooks_admin_password';
 // Default to empty or a specific demo URL if you have one. 
 // Using a placeholder here to encourage user configuration.
-const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbxZJNgNMg-45h47dCq35ljrVs3xv10d6b9Sr0uyjRf53kHZXm3VeEX-ARvNlUcAG-Tr/exec';
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbyGe-d1VPwhN660IrjQiynKqOuOcmsMeoiCHOxOK2DUbWzIVWnPXdx1XgWcH6a2N02_/exec';
 
 export const getApiUrl = () => localStorage.getItem(STORAGE_KEY_URL) || DEFAULT_API_URL;
 export const setApiUrl = (url: string) => localStorage.setItem(STORAGE_KEY_URL, url);
@@ -33,6 +33,7 @@ export const fetchBooksFromSheet = async (): Promise<Book[]> => {
       title: item.title ? String(item.title) : 'Untitled',
       subject: item.subject ? String(item.subject) : 'General',
       classLevel: item.classLevel ? String(item.classLevel) : '1',
+      subCategory: item.subCategory ? String(item.subCategory) : undefined,
       thumbnailUrl: item.thumbnailUrl ? String(item.thumbnailUrl) : '',
       pdfUrl: item.pdfUrl ? String(item.pdfUrl) : '',
       description: item.description ? String(item.description) : '',
@@ -81,4 +82,8 @@ export const updateBookInSheet = async (book: Book): Promise<boolean> => {
 
 export const deleteBookFromSheet = async (id: string): Promise<boolean> => {
   return sendToSheet({ action: 'delete', id });
+};
+
+export const resetAndSeedDatabase = async (books: Book[]): Promise<boolean> => {
+  return sendToSheet({ action: 'reset_and_seed', books });
 };
